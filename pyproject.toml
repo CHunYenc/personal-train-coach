@@ -1,0 +1,22 @@
+[project]
+name = "personal-train-coach"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fitdecode>=0.11.0",
+]
+
+[project.scripts]
+coach-parse = "ptc.cli:main"
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ptc"]
