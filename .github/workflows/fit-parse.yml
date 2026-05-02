@@ -73,6 +73,9 @@ jobs:
           set -euo pipefail
           uv run coach-parse --json "$FIT_PATH" | tee session.json
 
+      - name: Build sessions summary (all data/*.fit, UTC+8)
+        run: uv run coach-sessions-summary
+
       - name: Upload session.json
         uses: actions/upload-artifact@v4
         with:
