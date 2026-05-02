@@ -1,0 +1,134 @@
+name: Parse FIT (JSON)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "data/**/*.fit"
+  workflow_dispatch:
+    inputs:
+      fit_path:
+        description: "Path to .fit under repo root (e.g. data/foo.fit). Empty = lexicographic last under data/."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync project
+        run: uv sync
+
+      - name: Choose FIT file
+        id: fit
+        shell: bash
+        run: |
+          set -euo pipefail
+          EVENT_NAME="${{ github.event_name }}"
+          INPUT_FIT_PATH="${{ inputs.fit_path }}"
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ -n "${INPUT_FIT_PATH// }" ]]; then
+              echo "path=$INPUT_FIT_PATH" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            last="$(ls -1 data/*.fit 2>/dev/null | sort | tail -n 1 || true)"
+            if [[ -z "$last" ]]; then
+              echo "No data/*.fit files found." >&2
+              exit 1
+            fi
+            echo "path=$last" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mapfile -t files < <(git diff-tree --no-commit-id --name-only -r "${GITHUB_SHA}" | grep -E '^data/.*\.fit$' || true)
+          if [[ "${#files[@]}" -eq 0 ]]; then
+            echo "No data/*.fit in commit ${{ github.sha }}." >&2
+            exit 1
+          fi
+          pick="${files[-1]}"
+          echo "path=$pick" >> "$GITHUB_OUTPUT"
+          echo "Using FIT: $pick"
+
+      - name: Export session JSON
+        env:
+          FIT_PATH: ${{ steps.fit.outputs.path }}
+        run: |
+          set -euo pipefail
+          uv run coach-parse --json "$FIT_PATH" | tee session.json
+
+      - name: Upload session.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-json
+          path: session.json
+          if-no-files-found: error
+
+      - name: Install Cursor CLI
+        run: |
+          set -euo pipefail
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.cursor/bin" >> "$GITHUB_PATH"
+
+      - name: Run Cursor Agent (coach report)
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          FIT_PATH: ${{ steps.fit.outputs.path }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CURSOR_API_KEY:-}" ]]; then
+            echo "::error::Set repository secret CURSOR_API_KEY (Cursor dashboard API key)." >&2
+            exit 1
+          fi
+          FIT_STEM=$(basename "$FIT_PATH" .fit)
+          export FIT_STEM
+          python - <<'PY'
+          import os
+          import pathlib
+
+          fit_path = os.environ["FIT_PATH"]
+          stem = os.environ["FIT_STEM"]
+          template = pathlib.Path(".github/prompts/fit-coach-ci.md").read_text(encoding="utf-8")
+          prompt = template.replace("__FIT_PATH__", fit_path).replace("__FIT_STEM__", stem)
+          pathlib.Path("/tmp/coach_prompt.txt").write_text(prompt, encoding="utf-8")
+          PY
+          if command -v agent >/dev/null 2>&1; then
+            AGENT_BIN=agent
+          elif command -v cursor-agent >/dev/null 2>&1; then
+            AGENT_BIN=cursor-agent
+          else
+            echo "::error::PATH missing agent/cursor-agent after Cursor CLI install." >&2
+            exit 1
+          fi
+          "$AGENT_BIN" -p "$(cat /tmp/coach_prompt.txt)" --model auto --force
+
+      - name: Commit coach outputs
+        env:
+          FIT_PATH: ${{ steps.fit.outputs.path }}
+        run: |
+          set -euo pipefail
+          STEM=$(basename "$FIT_PATH" .fit)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          if [[ -f "analysis/${STEM}.md" ]]; then
+            git add "analysis/${STEM}.md"
+          fi
+          if git diff --cached --quiet; then
+            echo "No README/analysis changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: refresh AI coach report (${STEM})"
+          git push
