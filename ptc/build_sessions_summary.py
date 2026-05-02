@@ -102,8 +102,6 @@ def _row_for_summary(path: Path, repo_root: Path) -> dict | None:
         "table_elapsed": table_elapsed,
         "table_distance": table_distance,
         "table_calories": str(cal) if cal is not None else "",
-        "table_temp": str(tem) if tem is not None else "",
-        "table_ascent_descent": f"{asc}／{des}" if asc is not None and des is not None else "",
     }
 
 
@@ -118,6 +116,7 @@ def build_summary(repo_root: Path) -> dict:
     return {
         "display_timezone": "Asia/Taipei",
         "display_timezone_note": "Activity windows in rows use Asia/Taipei (UTC+8).",
+        "row_order": "data/*.fit sorted by basename (lexicographic ascending); README table row order must match `rows` exactly.",
         "rows": rows,
     }
 
