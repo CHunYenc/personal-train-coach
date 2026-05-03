@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from ptc.cli import parse_fit
+from ptc.cli import parse_fit, _pace_min_km
 
 DISPLAY_TZ = ZoneInfo("Asia/Taipei")
 
@@ -41,6 +41,29 @@ def _device_label(file_id: dict) -> str:
     if mfr:
         return str(mfr)
     return ""
+
+
+def _elapsed_hms(total_seconds: float | None) -> str:
+    if total_seconds is None:
+        return ""
+    s = int(round(total_seconds))
+    h, rem = divmod(s, 3600)
+    m, s2 = divmod(rem, 60)
+    if h:
+        return f"{h}:{m:02d}:{s2:02d}"
+    return f"{m}:{s2:02d}"
+
+
+def _datetime_short(win: str) -> str:
+    """Format activity_window_utc8 start as 'YYYY/MM/DD HH:mm'."""
+    if not win:
+        return ""
+    start_part = win.split(" → ")[0].strip()
+    try:
+        date_str, rest = start_part.split(" ", 1)
+        return f"{date_str.replace('-', '/')} {rest[:5]}"
+    except (ValueError, IndexError):
+        return ""
 
 
 def _row_for_summary(path: Path, repo_root: Path) -> dict | None:
@@ -102,6 +125,15 @@ def _row_for_summary(path: Path, repo_root: Path) -> dict | None:
         "table_elapsed": table_elapsed,
         "table_distance": table_distance,
         "table_calories": str(cal) if cal is not None else "",
+        "table_elapsed_hms": _elapsed_hms(timer),
+        "table_distance_km": f"{float(dist) / 1000:.2f} km" if dist is not None else "",
+        "table_pace": ((_pace_min_km(dist, timer) or "").replace("min/km", "/km")).strip(),
+        "table_avg_max_hr": (
+            f"{int(avg_hr)}／{int(max_hr)} bpm"
+            if avg_hr is not None and max_hr is not None
+            else ""
+        ),
+        "table_datetime_short": _datetime_short(win),
     }
 
 
