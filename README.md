@@ -1,6 +1,29 @@
 # personal-train-coach
 
-使用方式見 [repo-tutorial.md](repo-tutorial.md)。
+個人跑步訓練紀錄與 AI 教練分析。以 COROS PACE 4 記錄 `.fit` 活動，`coach-parse` CLI 負責解析，CI 自動呼叫 Cursor Agent 生成教練報告並寫回此 repo。
+
+完整安裝與使用說明：[repo-tutorial.md](repo-tutorial.md)
+
+## 快速開始
+
+```bash
+uv sync                          # 安裝依賴與建立 .venv
+uv run coach-parse               # 解析 data/ 最新 .fit（人類可讀）
+uv run coach-parse --json        # JSON 輸出（供 AI 流程使用）
+uv run coach-parse data/你的檔.fit --json
+```
+
+## 專案結構
+
+```
+personal-train-coach/
+├── data/        # COROS/Garmin .fit 活動檔（唯一真相來源）
+├── analysis/    # AI 教練逐場分析報告（每筆活動一份 .md）
+├── ptc/         # Python 套件：FIT 解析（cli.py）、跨場次摘要（build_sessions_summary.py）
+└── .github/     # CI 工作流程：data/*.fit push → 自動解析 → Cursor Agent 生成報告
+```
+
+`data/` 放裝置匯出的 `.fit`；`analysis/` 是每次 CI 跑完後自動生成的教練報告，可直接點下方連結閱讀。
 
 ---
 
