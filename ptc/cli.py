@@ -40,6 +40,55 @@ def parse_fit(path: Path) -> dict:
     return {"file": str(path), "file_id": file_id, "session": session}
 
 
+def parse_tcx(path: Path) -> dict:
+    """Extract session-level fields from a Garmin TCX (XML) file."""
+    import xml.etree.ElementTree as ET
+
+    NS = "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"
+    root = ET.parse(path).getroot()
+
+    act = root.find(f".//{{{NS}}}Activity")
+    id_text = ""
+    if act is not None:
+        raw = act.findtext(f"{{{NS}}}Id") or ""
+        id_text = raw.strip()
+
+    total_time, total_dist, total_cal, total_steps = 0.0, 0.0, 0, 0
+    hr_values: list[float] = []
+    for lap in (act.findall(f"{{{NS}}}Lap") if act is not None else []):
+        t = lap.findtext(f"{{{NS}}}TotalTimeSeconds")
+        d = lap.findtext(f"{{{NS}}}DistanceMeters")
+        c = lap.findtext(f"{{{NS}}}Calories")
+        h = lap.findtext(f"{{{NS}}}HeartRateBpm")
+        s = lap.findtext(f"{{{NS}}}Steps")
+        if t:
+            total_time += float(t)
+        if d:
+            total_dist += float(d)
+        if c:
+            total_cal += int(c)
+        if h:
+            hr_values.append(float(h))
+        if s:
+            total_steps += int(s)
+
+    avg_hr = round(sum(hr_values) / len(hr_values)) if hr_values else None
+    session: dict = {
+        "start_time": id_text,
+        "total_timer_time": total_time or None,
+        "total_elapsed_time": total_time or None,
+        "total_distance": total_dist or None,
+        "total_calories": total_cal or None,
+        "avg_heart_rate": avg_hr,
+        "max_heart_rate": None,
+        "min_heart_rate": None,
+        "sport": "running",
+    }
+    if total_steps:
+        session["tcx_steps"] = total_steps
+    return {"file": str(path), "file_id": {}, "session": session}
+
+
 def _pace_min_km(distance_m: float | None, time_s: float | None) -> str | None:
     if not distance_m or distance_m <= 0 or not time_s or time_s <= 0:
         return None
@@ -119,7 +168,10 @@ def main() -> None:
     if not fit_path.is_file():
         raise SystemExit(f"Not a file: {fit_path}")
 
-    summary = parse_fit(fit_path)
+    if fit_path.suffix.lower() == ".tcx":
+        summary = parse_tcx(fit_path)
+    else:
+        summary = parse_fit(fit_path)
 
     if args.json:
         print(json.dumps(summary, default=str, indent=2, ensure_ascii=False))

@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from ptc.cli import parse_fit, _pace_min_km
+from ptc.cli import parse_fit, parse_tcx, _pace_min_km
 
 DISPLAY_TZ = ZoneInfo("Asia/Taipei")
 
@@ -67,7 +67,10 @@ def _datetime_short(win: str) -> str:
 
 
 def _row_for_summary(path: Path, repo_root: Path) -> dict | None:
-    summary = parse_fit(path.resolve())
+    if path.suffix.lower() == ".tcx":
+        summary = parse_tcx(path.resolve())
+    else:
+        summary = parse_fit(path.resolve())
     session = summary.get("session")
     if not session:
         return None
@@ -131,7 +134,7 @@ def _row_for_summary(path: Path, repo_root: Path) -> dict | None:
         "table_avg_max_hr": (
             f"{int(avg_hr)}／{int(max_hr)} bpm"
             if avg_hr is not None and max_hr is not None
-            else ""
+            else (f"{int(avg_hr)} bpm" if avg_hr is not None else "")
         ),
         "table_datetime_short": _datetime_short(win),
     }
@@ -139,16 +142,19 @@ def _row_for_summary(path: Path, repo_root: Path) -> dict | None:
 
 def build_summary(repo_root: Path) -> dict:
     data_dir = repo_root / "data"
-    fits = sorted(data_dir.glob("*.fit"), key=lambda p: p.name)
+    analysis_dir = repo_root / "analysis"
+    all_files = list(data_dir.glob("*.fit")) + list(data_dir.glob("*.tcx"))
     rows: list[dict] = []
-    for p in fits:
+    for p in all_files:
         r = _row_for_summary(p, repo_root)
         if r:
+            r["has_analysis"] = (analysis_dir / f"{p.stem}.md").exists()
             rows.append(r)
+    rows.sort(key=lambda r: r.get("activity_window_utc8") or "")
     return {
         "display_timezone": "Asia/Taipei",
         "display_timezone_note": "Activity windows in rows use Asia/Taipei (UTC+8).",
-        "row_order": "data/*.fit sorted by basename (lexicographic ascending); README table row order must match `rows` exactly.",
+        "row_order": "sorted by activity_window_utc8 ascending (chronological); README table row order must match `rows` exactly.",
         "rows": rows,
     }
 

@@ -1,4 +1,4 @@
-name: Parse FIT (JSON)
+name: Parse activity (FIT/TCX)
 
 on:
   push:
@@ -7,10 +7,11 @@ on:
       - master
     paths:
       - "data/**/*.fit"
+      - "data/**/*.tcx"
   workflow_dispatch:
     inputs:
       fit_path:
-        description: "Path to .fit under repo root (e.g. data/foo.fit). Leave empty = lexicographic last file under data/*.fit."
+        description: "Path to .fit or .tcx under repo root (e.g. data/foo.fit). Leave empty = last file under data/*.fit or data/*.tcx."
         required: false
         default: ""
 
@@ -48,18 +49,18 @@ jobs:
               echo "path=$INPUT_FIT_PATH" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            last="$(ls -1 data/*.fit 2>/dev/null | sort | tail -n 1 || true)"
+            last="$(ls -1 data/*.fit data/*.tcx 2>/dev/null | sort | tail -n 1 || true)"
             if [[ -z "$last" ]]; then
-              echo "No data/*.fit files found." >&2
+              echo "No data/*.fit or data/*.tcx files found." >&2
               exit 1
             fi
             echo "path=$last" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          mapfile -t files < <(git diff-tree --no-commit-id --name-only -r "${GITHUB_SHA}" | grep -E '^data/.*\.fit$' || true)
+          mapfile -t files < <(git diff-tree --no-commit-id --name-only -r "${GITHUB_SHA}" | grep -E '^data/.*\.(fit|tcx)$' || true)
           if [[ "${#files[@]}" -eq 0 ]]; then
-            echo "No data/*.fit in commit ${{ github.sha }}." >&2
+            echo "No data/*.fit or data/*.tcx in commit ${{ github.sha }}." >&2
             exit 1
           fi
           pick="${files[-1]}"
@@ -102,7 +103,8 @@ jobs:
             echo "Secrets are not passed to workflows from fork PRs." >&2
             exit 1
           fi
-          FIT_STEM=$(basename "$FIT_PATH" .fit)
+          FIT_STEM=$(basename "$FIT_PATH")
+          FIT_STEM="${FIT_STEM%.*}"
           export FIT_STEM
           python - <<'PY'
           import os
@@ -129,7 +131,8 @@ jobs:
           FIT_PATH: ${{ steps.fit.outputs.path }}
         run: |
           set -euo pipefail
-          STEM=$(basename "$FIT_PATH" .fit)
+          STEM=$(basename "$FIT_PATH")
+          STEM="${STEM%.*}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add README.md
