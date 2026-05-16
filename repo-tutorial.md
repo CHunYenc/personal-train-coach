@@ -48,6 +48,20 @@ uv run coach-parse --json
 uv run coach-parse "data/你的檔案.fit" --json
 ```
 
+### 跨場次摘要（含目標進度）
+
+```bash
+uv run coach-sessions-summary
+```
+
+這會掃描 `data/*.fit` 與 `data/*.tcx`，產生 `sessions_summary.json`。若根目錄有 `training_profile.json`，輸出會包含目標設定、近四週週趨勢、最長單次與 10K 進度，供 AI 報告引用。
+
+### 訓練目標與跑後主觀紀錄
+
+- `training_profile.json`：記錄目前目標、賽事、長期動機與報告偏好，例如金門馬拉松 10K、跑得開心、1K 4:19 的長期火種。
+- `training_journal/`：每次跑後可新增一個 JSON，記錄 RPE、開心程度、睡眠、痠痛與備註。檔名建議和活動檔 stem 一致，例如 `training_journal/20260515203341.json`。
+- 主觀紀錄不是必填；沒有紀錄時，AI 報告應明確標示未知，不推測心情或疲勞。
+
 ### 說明
 
 - 人類可讀模式會印出 `session` 主要欄位與其餘非空欄位列表。

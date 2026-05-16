@@ -33,6 +33,7 @@ This is a **personal running training log analyzer**. It parses Garmin/COROS act
 data/*.fit or data/*.tcx
     ↓ coach-parse --json
 session.json
+data/*.fit or data/*.tcx + training_profile.json + training_journal/*.json
     ↓ coach-sessions-summary
 sessions_summary.json
     ↓ Cursor Agent (CI)
@@ -43,7 +44,11 @@ analysis/<stem>.md + README.md update
 
 - **`ptc/cli.py`** — Parses binary `.fit` (via `fitdecode`) and XML `.tcx` files. Extracts session-level aggregates: distance, time, pace, heart rate, calories, ascent. `parse_fit()` reads `file_id` + final `session` frame; `parse_tcx()` reads XML equivalents.
 
-- **`ptc/build_sessions_summary.py`** — Scans all `data/*.fit` and `data/*.tcx`, builds a chronologically-sorted array of rows with precomputed display strings (table_elapsed_hms, table_distance_km, table_pace, etc.). All datetimes are rendered in Asia/Taipei (UTC+8). Writes `sessions_summary.json`.
+- **`ptc/build_sessions_summary.py`** — Scans all `data/*.fit` and `data/*.tcx`, builds a chronologically-sorted array of rows with precomputed display strings (table_elapsed_hms, table_distance_km, table_pace, etc.). Also includes `training_profile.json`, optional `training_journal/*.json` entries, weekly trends, and 10K goal progress when available. All datetimes are rendered in Asia/Taipei (UTC+8). Writes `sessions_summary.json`.
+
+- **`training_profile.json`** — Versioned goal context for reports: target race, emotional goal, long-term speed memory, and reporting preferences.
+
+- **`training_journal/`** — Optional post-run subjective JSON logs keyed by activity stem (RPE, enjoyment, sleep, soreness, notes).
 
 ### CI pipeline (`.github/workflows/fit-parse.yml`)
 
@@ -58,7 +63,7 @@ The CI requires a `CURSOR_API_KEY` secret. File selection uses `git diff-tree` (
 ### AI coaching output
 
 - **`analysis/<stem>.md`** — Per-activity coaching report in Chinese
-- **`README.md`** `## AI 教練分析報告` section — auto-maintained summary table + report links
+- **`README.md`** `## AI 教練分析報告` section — auto-maintained goal dashboard + weekly trends + summary table + report links
 
 The prompt template at `.github/prompts/fit-coach-ci.md` strictly controls output structure and language. Do not fabricate numbers; all metrics must come from JSON artifacts.
 

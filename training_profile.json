@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "athlete_context": {
+    "training_age_note": "慢跑即將邁入第二個月",
+    "recent_achievement": {
+      "name": "富士山線上馬拉松",
+      "description": "10 天內累積完成 21K",
+      "emotional_note": "完成了，但成就感沒有預期強烈"
+    }
+  },
+  "goals": {
+    "primary_race": {
+      "event": "金門馬拉松",
+      "distance": "10K",
+      "priority": "開心完賽",
+      "target_date": null
+    },
+    "short_term": "穩定、舒服地完成 10K",
+    "emotional": "跑得開心，讓跑步成為可以長期維持的生活節奏",
+    "long_term_speed": {
+      "memory": "國中體能測驗 1K 4:19",
+      "stance": "把 4:19 當成長期火種，不作為目前每次訓練的壓力指標",
+      "milestones": [
+        "1K 6:00",
+        "1K 5:30",
+        "1K 5:00",
+        "1K 4:30",
+        "1K 4:19"
+      ]
+    }
+  },
+  "training_preferences": {
+    "weekly_runs_target": 3,
+    "priority_order": [
+      "健康與恢復",
+      "穩定出門",
+      "10K 耐力",
+      "速度感"
+    ],
+    "notes": [
+      "多數跑步應該保留餘裕",
+      "速度刺激以短而輕快為主，不急著追 4:19"
+    ]
+  },
+  "reporting": {
+    "include_goal_context": true,
+    "include_enjoyment_check": true,
+    "include_weekly_trends": true
+  }
+}
