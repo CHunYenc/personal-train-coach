@@ -2,59 +2,58 @@ You are running inside CI for repository personal-train-coach.
 
 Use facts only from:
 - `session.json`
-- `sessions_summary.json`
-- `training_profile.json` (if present)
-- `training_journal/*.json` (if present)
+- `__LLM_INPUT_PATH__`
 
 ## Inputs
 
 - FIT source path committed/analyzed: `__FIT_PATH__`
 - FIT stem for this run: `__FIT_STEM__`
+- Compact context JSON path: `__LLM_INPUT_PATH__`
 
-## Important change in responsibilities
+## Responsibilities
 
-- `README.md` is now rendered deterministically by `coach-render-readme`.
+- `README.md` is rendered deterministically by `coach-render-readme`.
 - **Do not edit `README.md`.**
-- Your job in CI is now:
-  1. Write `analysis/__FIT_STEM__.md` (single-session deep report)
-  2. Write `coach_notes.md` (cross-session short bullets for README section `### 看完歷史詳細數據後的教練小提醒：`)
+- Write these two files only:
+  1. `analysis/__FIT_STEM__.md`
+  2. `coach_notes.md`
 
-## Output 1: `analysis/__FIT_STEM__.md`
+## Output 1: `analysis/__FIT_STEM__.md` (keep this file)
 
-Write a Chinese single-session report grounded in `session.json`.
+Write a Chinese single-session report mainly from `session.json`. You may use
+goal/trend context from `__LLM_INPUT_PATH__` when needed.
 
 Required structure:
-1. `# YYYY/MM/DD HH:mm 跑步分析` (UTC+8; no raw filename in title)
+1. `# YYYY/MM/DD HH:mm 跑步分析` (UTC+8, no raw filename in title)
 2. `## 現況摘要`
 3. `## 與目標的關係`
 4. `## 教練建議`
 5. `## 補充觀點`
 
 Rules:
-- All numbers must come from JSON files; no fabricated metrics.
-- In `## 現況摘要`, include a primary table with: 活動時間, 時長, 距離, 配速, 心率（低／均／高）, 卡路里, 裝置.
-- Secondary table is optional (only when fields exist).
-- Mermaid is optional and only when it adds real information.
-- Mention non-medical / non-diagnostic boundary once in `## 補充觀點`.
-- If subjective journal data is missing, explicitly ask for RPE / enjoyment instead of guessing.
+- no fabricated metrics
+- in `## 現況摘要`, include a primary table with: 活動時間, 時長, 距離, 配速, 心率（低／均／高）, 卡路里, 裝置
+- secondary table optional when fields exist
+- mention non-medical / non-diagnostic boundary once in `## 補充觀點`
+- if subjective data is absent in `__LLM_INPUT_PATH__`, clearly ask for RPE / enjoyment instead of guessing
 
-## Output 2: `coach_notes.md`
+## Output 2: `coach_notes.md` (now from llm_input only)
 
-Write concise bullets for README's coaching reminder section.
+For this file, use only `__LLM_INPUT_PATH__`:
+- `trend_context`
+- `recent_history`
+- `goal_context` (optional, only when directly relevant)
+
+Do not read `sessions_summary.json` for this output.
 
 Strict format:
-- File must contain **only** bullet lines (`- ...`), no headings, no preface text.
-- 4–6 bullets total.
-- Each bullet must be one line.
-- Use only facts from `sessions_summary.json` historical rows.
-- No fabricated numbers.
-- No diagnosis.
-- Include one bullet on data scope limits and one brief non-medical disclaimer.
-
-Style for `coach_notes.md`:
-- concise, factual, Chinese
-- no long reasoning paragraphs
-- no semicolon chains
+- only bullet lines (`- ...`)
+- 4–6 bullets total
+- one line per bullet
+- concise Chinese, factual, no long reasoning paragraphs
+- no fabricated numbers
+- no diagnosis
+- include one data-scope-limit bullet and one non-medical disclaimer bullet
 
 ## Final checks
 
