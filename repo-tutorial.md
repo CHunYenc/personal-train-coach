@@ -15,7 +15,7 @@
 uv sync
 ```
 
-會建立 `.venv`、安裝 `fitdecode` 與本專案（含指令 `coach-parse`）。
+會建立 `.venv`、安裝 `fitdecode` 與本專案（含指令 `coach-parse`、`coach-sessions-summary`、`coach-build-llm-input`、`coach-render-readme`）。
 
 ## 使用方式
 
@@ -56,6 +56,22 @@ uv run coach-sessions-summary
 
 這會掃描 `data/*.fit` 與 `data/*.tcx`，產生 `sessions_summary.json`。若根目錄有 `training_profile.json`，輸出會包含目標設定、近四週週趨勢、最長單次與 10K 進度，供 AI 報告引用。
 
+### 產生 AI 精簡輸入（`llm_input.json`）
+
+```bash
+uv run coach-build-llm-input
+uv run coach-build-llm-input --fit-path "data/你的檔案.fit" -o llm_input.json
+```
+
+`llm_input.json` 是給 LLM 的精簡上下文，重點包含：
+
+- `current_activity`：本次活動的核心數字（距離、配速、心率、卡路里等）
+- `goal_context`：目標脈絡（10K、情緒目標、長期速度火種）
+- `trend_context`：活動總量、近四週趨勢、目標進度
+- `recent_history`：近期場次摘要（預設最近 8 筆）
+
+用途：讓像 `coach_notes` 這種短建議改吃精簡檔，降低 token 成本。
+
 ### 訓練目標與跑後主觀紀錄
 
 - `training_profile.json`：記錄目前目標、賽事、長期動機與報告偏好，例如金門馬拉松 10K、跑得開心、1K 4:19 的長期火種。
@@ -71,14 +87,18 @@ uv run coach-sessions-summary
 
 ### 整體流程（目標）
 
-之後若要把「教練報告」也自動化，可以照這條線想（**由上到下**）：
+目前 CI 的自動化流程（**由上到下**）：
 
-1. **`data/` 有新活動檔** — 將 `.fit` commit 並 push 到 GitHub（或用手動跑 workflow）。
-2. **解析成 JSON** — 在 CI 裡執行 `uv sync` 與 `uv run coach-parse --json …`，得到結構化的 `session.json`（方便 `jq`、腳本或 API 使用）。
-3. **（選用）AI 分析** — 以 Cursor Agent、其他 CLI、或 HTTP API 讀取 `session.json`，產出教練文字（段落、建議、週期化提醒等）。
-4. **（選用）寫回 `README.md`** — 只更新 **`## AI 教練分析報告`** 底下的內容；頂部連到本教學的段落不要動。寫入後需 **`git commit` / 開 PR**（並設定 workflow 的 `permissions` 與 token），否則 runner 結束後變更不會進 repo。
+1. **`data/` 有新活動檔** — 將 `.fit` / `.tcx` commit 並 push 到 GitHub（或手動觸發 workflow）。
+2. **解析成 JSON** — 在 CI 裡執行 `uv run coach-parse --json` 產生 `session.json`，再執行 `uv run coach-sessions-summary` 產生 `sessions_summary.json`。
+3. **建立精簡 LLM 上下文** — 執行 `uv run coach-build-llm-input` 產生 `llm_input.json`（CI 目前寫到 `/tmp/coach_llm_input.json`）。
+4. **AI 產生文字檔** — Cursor Agent 產生：
+   - `analysis/<stem>.md`（單次深度分析，保留）
+   - `coach_notes.md`（README 用短提醒；改吃 `llm_input.json`）
+5. **Deterministic 寫回 README** — `uv run coach-render-readme` 用 `sessions_summary.json + coach_notes.md` 重建 `README.md` 的 AI 區塊。
+6. **Commit & push** — 將 `README.md` 與 `analysis/<stem>.md` 提交回分支。
 
-**備註**：`.fit` 仍是唯一真相來源；JSON 是解析結果，教練文字是再上一層的衍生產物。不必長期把 `session.json` commit 進 git，用 **artifact** 保存每次 CI 輸出即可；若要版本化報告，可改存 `reports/日期.md` 再 PR。
+**備註**：`.fit/.tcx` 仍是唯一真相來源；JSON 是解析結果，教練文字是衍生產物。不必長期把 `session.json` / `sessions_summary.json` commit 進 git，可用 artifact 保存每次 CI 輸出。
 
 ### 目前已實作（`fit-parse.yml`）
 
@@ -87,20 +107,29 @@ uv run coach-sessions-summary
 - **選檔**：CI 裡**不能**依賴本機那套「mtime 最新」（clone 下來時間戳相近）。因此 **push** 時會用 `git diff-tree` 看**該次 commit** 裡出現的 `data/*.fit`（多個時取列表**最後一個**，行為固定）。**手動執行**可填輸入 `fit_path`；不填則取 `data/*.fit` 依檔名排序的最後一個。
 - **產出**：
   - 將 `coach-parse --json` 的 stdout 寫入 `session.json`，以 **artifact** `session-json` 上傳。
-  - 安裝 **Cursor CLI** 後以 **Cursor Agent**（`agent -p … --force`，模型見 workflow）讀取 `session.json`，更新根目錄 **`README.md`** 的 `## AI 教練分析報告` 區塊，並寫入 **`analysis/<檔名 stem>.md`**。
-  - 將上述變更 **`git commit` / `git push`** 回同一分支（job 已設 `permissions: contents: write`，並依賴預設 `GITHUB_TOKEN`）。
+  - 產生 `sessions_summary.json` 與精簡 AI 輸入 `/tmp/coach_llm_input.json`。
+  - 安裝 **Cursor CLI** 後以 **Cursor Agent**（`agent -p … --force`，模型見 workflow）產生 **`analysis/<檔名 stem>.md`** 與 **`coach_notes.md`**（`coach_notes.md` 使用 `llm_input`）。
+  - 執行 `coach-render-readme`，由程式 deterministic 重建根目錄 **`README.md`** 的 `## AI 教練分析報告` 區塊。
+  - 將 `README.md` 與 `analysis/<檔名 stem>.md` **`git commit` / `git push`** 回同一分支（job 已設 `permissions: contents: write`，並依賴預設 `GITHUB_TOKEN`）。
 - **Secrets**：在 repo **Settings → Secrets → Actions** 設定 **`CURSOR_API_KEY`**（Cursor 帳號／Cloud Agents API key）。未設定時該 job 會失敗並提示缺少 secret。
 - **Repo 設定**：GitHub **Settings → Actions → General → Workflow permissions** 須允許 **Read and write**，否則無法 push。
 
 若你的預設分支不是 `main` / `master`，請編輯 workflow 的 `branches` 列表。若 **`main` 啟用 branch protection** 且禁止 GitHub Actions 直接 push，需調整保護規則或改成開 PR 流程。
 
-### Prompt 範本
+### Prompt 與模型輸入
 
-- CI 使用的指令模板：`.github/prompts/fit-coach-ci.md`（由 workflow 代入本次 FIT 路徑與檔名 stem）。
+- CI 使用的指令模板：`.github/prompts/fit-coach-ci.md`（workflow 會代入本次 FIT 路徑、檔名 stem、以及 `llm_input` 路徑）。
+- 目前規劃是：
+  - `analysis/<stem>.md`：以 `session.json` 為主，必要時參考 `llm_input`
+  - `coach_notes.md`：只使用 `llm_input`
 
 ### 驗證
 
-- 於 GitHub **Actions** 挑選 **Parse FIT (JSON)** → **Run workflow**（可不選 `fit_path`）並確認該次 run 完成、`session-json` artifact 可下載、`CURSOR_API_KEY` 已設定。
+- 於 GitHub **Actions** 挑選 **Parse FIT (JSON)** → **Run workflow**（可不選 `fit_path`），並確認：
+  - run 成功
+  - `session-json` artifact 可下載
+  - `CURSOR_API_KEY` 已設定
+  - repo 中有更新後的 `README.md` 與 `analysis/<stem>.md`
 
 ## Cursor：AI 馬拉松教練 skill
 
