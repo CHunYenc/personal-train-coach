@@ -11,6 +11,8 @@ dependencies = [
 [project.scripts]
 coach-parse = "ptc.cli:main"
 coach-sessions-summary = "ptc.build_sessions_summary:main"
+coach-render-readme = "ptc.render_readme_ai_report:main"
+coach-build-llm-input = "ptc.build_llm_input:main"
 
 [tool.uv]
 package = true

@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "purpose": "Compact context for LLM coaching text generation.",
+  "display_timezone": "Asia/Taipei",
+  "current_activity": {
+    "fit_path": "data/20260516182313.fit",
+    "fit_stem": "20260516182313",
+    "activity_start_utc8": "2026/05/16 18:23",
+    "elapsed": "34:00",
+    "distance": "5.13 km",
+    "pace": "6:37 /km",
+    "avg_max_hr": "153／166 bpm",
+    "calories": "388",
+    "device": "COROS PACE 4",
+    "sport": "running",
+    "start_time_raw": "2026-05-16T10:23:13+00:00",
+    "distance_m": 5133.18,
+    "timer_s": 2040.25,
+    "pace_from_session": "6:37 /km",
+    "avg_hr": 153,
+    "max_hr": 166,
+    "min_hr": 87,
+    "calories_raw": 388,
+    "device_name": "COROS PACE 4"
+  },
+  "goal_context": {
+    "primary_race": {
+      "event": "金門馬拉松",
+      "distance": "10K",
+      "priority": "開心完賽",
+      "target_date": null
+    },
+    "short_term": "穩定、舒服地完成 10K",
+    "emotional": "跑得開心，讓跑步成為可以長期維持的生活節奏",
+    "long_term_speed": {
+      "memory": "國中體能測驗 1K 4:19",
+      "stance": "把 4:19 當成長期火種，不作為目前每次訓練的壓力指標",
+      "milestones": [
+        "1K 6:00",
+        "1K 5:30",
+        "1K 5:00",
+        "1K 4:30",
+        "1K 4:19"
+      ]
+    },
+    "weekly_runs_target": 3,
+    "priority_order": [
+      "健康與恢復",
+      "穩定出門",
+      "10K 耐力",
+      "速度感"
+    ]
+  },
+  "trend_context": {
+    "activity_count": 14,
+    "total_distance_km": 76.65,
+    "recent_weekly_trends": [
+      {
+        "week": "2026-W17",
+        "week_start_utc8": "2026-04-20",
+        "run_count": 3,
+        "distance_km": 17.36,
+        "duration_min": 139.6,
+        "longest_run_km": 8.05,
+        "table_distance_km": "17.36 km",
+        "table_duration_min": "140 min"
+      },
+      {
+        "week": "2026-W18",
+        "week_start_utc8": "2026-04-27",
+        "run_count": 2,
+        "distance_km": 10.91,
+        "duration_min": 83.5,
+        "longest_run_km": 7.12,
+        "table_distance_km": "10.91 km",
+        "table_duration_min": "84 min"
+      },
+      {
+        "week": "2026-W19",
+        "week_start_utc8": "2026-05-04",
+        "run_count": 3,
+        "distance_km": 18.62,
+        "duration_min": 135.7,
+        "longest_run_km": 8.18,
+        "table_distance_km": "18.62 km",
+        "table_duration_min": "136 min"
+      },
+      {
+        "week": "2026-W20",
+        "week_start_utc8": "2026-05-11",
+        "run_count": 4,
+        "distance_km": 22.48,
+        "duration_min": 157.1,
+        "longest_run_km": 6.7,
+        "table_distance_km": "22.48 km",
+        "table_duration_min": "157 min"
+      }
+    ],
+    "goal_progress": {
+      "longest_run_km": 8.18,
+      "longest_run_datetime": "2026/05/07 17:56",
+      "target_distance_km": 10.0,
+      "progress_percent_by_longest_run": 81.8,
+      "remaining_km_by_longest_run": 1.82,
+      "latest_week_runs_vs_target": "4 / 3"
+    },
+    "training_journal_entry_count": 0
+  },
+  "recent_history": [
+    {
+      "fit_stem": "20260502214807",
+      "datetime": "2026/05/02 21:48",
+      "elapsed": "30:03",
+      "distance": "3.80 km",
+      "pace": "7:55 /km",
+      "avg_max_hr": "141／161 bpm",
+      "calories": "291",
+      "has_analysis": true
+    },
+    {
+      "fit_stem": "20260505210643",
+      "datetime": "2026/05/05 21:06",
+      "elapsed": "35:17",
+      "distance": "5.03 km",
+      "pace": "7:01 /km",
+      "avg_max_hr": "140／155 bpm",
+      "calories": "270",
+      "has_analysis": true
+    },
+    {
+      "fit_stem": "20260507175604",
+      "datetime": "2026/05/07 17:56",
+      "elapsed": "59:41",
+      "distance": "8.18 km",
+      "pace": "7:18 /km",
+      "avg_max_hr": "152／167 bpm",
+      "calories": "673",
+      "has_analysis": true
+    },
+    {
+      "fit_stem": "20260509185251",
+      "datetime": "2026/05/09 18:52",
+      "elapsed": "40:44",
+      "distance": "5.42 km",
+      "pace": "7:31 /km",
+      "avg_max_hr": "150／168 bpm",
+      "calories": "447",
+      "has_analysis": true
+    },
+    {
+      "fit_stem": "20260511175151",
+      "datetime": "2026/05/11 17:51",
+      "elapsed": "45:28",
+      "distance": "6.57 km",
+      "pace": "6:55 /km",
+      "avg_max_hr": "149／162 bpm",
+      "calories": "493",
+      "has_analysis": true
+    },
+    {
+      "fit_stem": "20260513193246",
+      "datetime": "2026/05/13 19:32",
+      "elapsed": "47:12",
+      "distance": "6.70 km",
+      "pace": "7:02 /km",
+      "avg_max_hr": "153／163 bpm",
+      "calories": "536",
+      "has_analysis": true
+    },
+    {
+      "fit_stem": "20260515203341",
+      "datetime": "2026/05/15 20:33",
+      "elapsed": "30:26",
+      "distance": "4.07 km",
+      "pace": "7:28 /km",
+      "avg_max_hr": "149／167 bpm",
+      "calories": "334",
+      "has_analysis": true
+    },
+    {
+      "fit_stem": "20260516182313",
+      "datetime": "2026/05/16 18:23",
+      "elapsed": "34:00",
+      "distance": "5.13 km",
+      "pace": "6:37 /km",
+      "avg_max_hr": "153／166 bpm",
+      "calories": "388",
+      "has_analysis": true
+    }
+  ],
+  "output_requirements": {
+    "coach_notes": {
+      "language": "zh-TW",
+      "bullet_count": "4-6",
+      "single_line_each": true,
+      "must_include_scope_limit_and_non_medical_disclaimer": true
+    }
+  }
+}

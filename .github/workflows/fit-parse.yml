@@ -77,6 +77,17 @@ jobs:
       - name: Build sessions summary (all data/*.fit, UTC+8)
         run: uv run coach-sessions-summary
 
+      - name: Build compact LLM input
+        env:
+          FIT_PATH: ${{ steps.fit.outputs.path }}
+        run: |
+          set -euo pipefail
+          uv run coach-build-llm-input \
+            --fit-path "$FIT_PATH" \
+            --session session.json \
+            --summary sessions_summary.json \
+            --output /tmp/coach_llm_input.json
+
       - name: Upload session.json
         uses: actions/upload-artifact@v4
         with:
@@ -94,6 +105,7 @@ jobs:
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           FIT_PATH: ${{ steps.fit.outputs.path }}
+          LLM_INPUT_PATH: /tmp/coach_llm_input.json
         run: |
           set -euo pipefail
           if [[ -z "${CURSOR_API_KEY:-}" ]]; then
@@ -112,8 +124,13 @@ jobs:
 
           fit_path = os.environ["FIT_PATH"]
           stem = os.environ["FIT_STEM"]
+          llm_input_path = os.environ["LLM_INPUT_PATH"]
           template = pathlib.Path(".github/prompts/fit-coach-ci.md").read_text(encoding="utf-8")
-          prompt = template.replace("__FIT_PATH__", fit_path).replace("__FIT_STEM__", stem)
+          prompt = (
+              template.replace("__FIT_PATH__", fit_path)
+              .replace("__FIT_STEM__", stem)
+              .replace("__LLM_INPUT_PATH__", llm_input_path)
+          )
           pathlib.Path("/tmp/coach_prompt.txt").write_text(prompt, encoding="utf-8")
           PY
           if command -v agent >/dev/null 2>&1; then
@@ -125,6 +142,16 @@ jobs:
             exit 1
           fi
           "$AGENT_BIN" -p "$(cat /tmp/coach_prompt.txt)" --model auto --force
+
+      - name: Render README section deterministically
+        env:
+          FIT_PATH: ${{ steps.fit.outputs.path }}
+        run: |
+          set -euo pipefail
+          FIT_STEM=$(basename "$FIT_PATH")
+          FIT_STEM="${FIT_STEM%.*}"
+          uv run coach-render-readme --fit-path "$FIT_PATH" --fit-stem "$FIT_STEM" --coach-notes-path coach_notes.md
+          rm -f coach_notes.md
 
       - name: Commit coach outputs
         env:
