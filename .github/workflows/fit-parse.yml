@@ -126,6 +126,16 @@ jobs:
           fi
           "$AGENT_BIN" -p "$(cat /tmp/coach_prompt.txt)" --model auto --force
 
+      - name: Render README section deterministically
+        env:
+          FIT_PATH: ${{ steps.fit.outputs.path }}
+        run: |
+          set -euo pipefail
+          FIT_STEM=$(basename "$FIT_PATH")
+          FIT_STEM="${FIT_STEM%.*}"
+          uv run coach-render-readme --fit-path "$FIT_PATH" --fit-stem "$FIT_STEM" --coach-notes-path coach_notes.md
+          rm -f coach_notes.md
+
       - name: Commit coach outputs
         env:
           FIT_PATH: ${{ steps.fit.outputs.path }}
