@@ -10,11 +10,19 @@
   },
   "goals": {
     "primary_race": {
-      "event": "金門馬拉松",
+      "event": "2026 台北 Garmin Run",
       "distance": "10K",
+      "date": "2026-11-29",
       "priority": "開心完賽",
-      "target_date": null
+      "notes": "已報名確定"
     },
+    "future_races": [
+      {
+        "event": "金門馬拉松",
+        "distance": "10K",
+        "status": "待報名資訊確定"
+      }
+    ],
     "short_term": "穩定、舒服地完成 10K",
     "emotional": "跑得開心，讓跑步成為可以長期維持的生活節奏",
     "long_term_speed": {
