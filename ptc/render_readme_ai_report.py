@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from datetime import date, timedelta
 from pathlib import Path
 
 
@@ -137,30 +138,56 @@ def _weekly_section(snapshot: dict) -> str:
     return "\n".join(lines)
 
 
-def _analysis_list_section(rows: list[dict], analysis_dir: Path) -> str:
-    label_by_stem: dict[str, str] = {}
+def _calendar_heatmap_section(rows: list[dict], analysis_dir: Path) -> str:
+    run_by_date: dict[date, dict] = {}
     for row in rows:
+        label = str(row.get("table_datetime_short") or "")
+        m = re.match(r"(\d{4})/(\d{2})/(\d{2})", label)
+        if not m:
+            continue
+        d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
         fit_name = str(row.get("fit_basename") or "")
         stem = Path(fit_name).stem
-        if stem:
-            label_by_stem[stem] = str(row.get("table_datetime_short") or "")
+        dist_text = str(row.get("table_distance_km") or "")
+        dm = re.search(r"(\d+(?:\.\d+)?)", dist_text)
+        dist = float(dm.group(1)) if dm else 0.0
+        if d not in run_by_date or dist > run_by_date[d]["dist"]:
+            run_by_date[d] = {"dist": dist, "stem": stem}
 
-    groups: dict[str, list[str]] = {}
-    for path in sorted(analysis_dir.glob("*.md"), key=lambda p: p.stem):
-        stem = path.stem
-        key = stem[:6] if len(stem) >= 6 else stem
-        groups.setdefault(key, []).append(stem)
+    if not run_by_date:
+        return "### 訓練日曆\n\n- 尚無訓練紀錄。"
 
-    lines = ["### 歷史分析報告列表", ""]
-    if not groups:
-        lines.append("- 目前尚無分析報告。")
-        return "\n".join(lines)
+    first = min(run_by_date)
+    last = max(run_by_date)
+    start = first - timedelta(days=first.weekday())
+    end = last + timedelta(days=(6 - last.weekday()))
 
-    for month in sorted(groups):
-        lines.append(f"- {month}")
-        for stem in groups[month]:
-            label = label_by_stem.get(stem) or stem
-            lines.append(f"  - [{label}](analysis/{stem}.md)")
+    lines = [
+        "### 訓練日曆",
+        "",
+        "| 週 | 一 | 二 | 三 | 四 | 五 | 六 | 日 |",
+        "| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
+    ]
+
+    cur = start
+    while cur <= end:
+        week_label = cur.strftime("%m/%d")
+        cells = []
+        for i in range(7):
+            d = cur + timedelta(days=i)
+            if d in run_by_date:
+                info = run_by_date[d]
+                dist = info["dist"]
+                stem = info["stem"]
+                text = f"{dist:.1f}k"
+                if (analysis_dir / f"{stem}.md").exists():
+                    text = f"[{text}](analysis/{stem}.md)"
+                cells.append(f"**{text}**")
+            else:
+                cells.append("")
+        lines.append(f"| {week_label} | " + " | ".join(cells) + " |")
+        cur += timedelta(weeks=1)
+
     return "\n".join(lines)
 
 
@@ -170,9 +197,7 @@ def _table_cell(value: object) -> str:
 
 
 def _history_table_section(rows: list[dict], analysis_dir: Path) -> str:
-    lines = [
-        "### 歷史詳細數據表",
-        "",
+    table_lines = [
         "| 日期 | 時長 | 距離 | 配速 | 心率（均／高） | 卡路里 |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
@@ -185,7 +210,7 @@ def _history_table_section(rows: list[dict], analysis_dir: Path) -> str:
         if has_analysis and date_cell != "—":
             date_cell = f"[{date_cell}](analysis/{stem}.md)"
 
-        lines.append(
+        table_lines.append(
             "| "
             + " | ".join(
                 [
@@ -199,6 +224,18 @@ def _history_table_section(rows: list[dict], analysis_dir: Path) -> str:
             )
             + " |",
         )
+
+    count = len(rows)
+    lines = [
+        "### 歷史詳細數據表",
+        "",
+        f"<details>",
+        f"<summary>展開所有 {count} 筆紀錄</summary>",
+        "",
+        *table_lines,
+        "",
+        "</details>",
+    ]
     return "\n".join(lines)
 
 
@@ -352,7 +389,7 @@ def render_ai_section(
     parts = [
         _goal_section(profile),
         _weekly_section(snapshot),
-        _analysis_list_section(rows, analysis_dir),
+        _calendar_heatmap_section(rows, analysis_dir),
         _history_table_section(rows, analysis_dir),
         _coach_notes_section(rows, journal_count, coach_notes_path),
         _source_section(rows, fit_path, fit_stem),
