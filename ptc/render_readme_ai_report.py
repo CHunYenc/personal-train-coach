@@ -3,11 +3,12 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from datetime import date, timedelta
 from pathlib import Path
 
 
 AI_HEADING = "## AI 教練分析報告"
-COACH_HEADING = "### 看完歷史詳細數據後的教練小提醒："
+COACH_HEADING = "### 教練小提醒"
 
 
 def _read_json(path: Path) -> dict:
@@ -137,69 +138,129 @@ def _weekly_section(snapshot: dict) -> str:
     return "\n".join(lines)
 
 
-def _analysis_list_section(rows: list[dict], analysis_dir: Path) -> str:
-    label_by_stem: dict[str, str] = {}
+def _calendar_heatmap_section(rows: list[dict], analysis_dir: Path) -> str:
+    run_by_date: dict[date, dict] = {}
     for row in rows:
+        label = str(row.get("table_datetime_short") or "")
+        m = re.match(r"(\d{4})/(\d{2})/(\d{2})", label)
+        if not m:
+            continue
+        d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
         fit_name = str(row.get("fit_basename") or "")
         stem = Path(fit_name).stem
-        if stem:
-            label_by_stem[stem] = str(row.get("table_datetime_short") or "")
+        dist_text = str(row.get("table_distance_km") or "")
+        dm = re.search(r"(\d+(?:\.\d+)?)", dist_text)
+        dist = float(dm.group(1)) if dm else 0.0
+        if d not in run_by_date or dist > run_by_date[d]["dist"]:
+            run_by_date[d] = {"dist": dist, "stem": stem}
 
-    groups: dict[str, list[str]] = {}
-    for path in sorted(analysis_dir.glob("*.md"), key=lambda p: p.stem):
-        stem = path.stem
-        key = stem[:6] if len(stem) >= 6 else stem
-        groups.setdefault(key, []).append(stem)
+    if not run_by_date:
+        return "### 訓練日曆\n\n- 尚無訓練紀錄。"
 
-    lines = ["### 歷史分析報告列表", ""]
-    if not groups:
-        lines.append("- 目前尚無分析報告。")
-        return "\n".join(lines)
+    first = min(run_by_date)
+    last = max(run_by_date)
+    start = first - timedelta(days=first.weekday())
+    end = last + timedelta(days=(6 - last.weekday()))
 
-    for month in sorted(groups):
-        lines.append(f"- {month}")
-        for stem in groups[month]:
-            label = label_by_stem.get(stem) or stem
-            lines.append(f"  - [{label}](analysis/{stem}.md)")
+    lines = [
+        "### 訓練日曆",
+        "",
+        "| 週 | 一 | 二 | 三 | 四 | 五 | 六 | 日 |",
+        "| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
+    ]
+
+    cur = start
+    while cur <= end:
+        week_label = cur.strftime("%m/%d")
+        cells = []
+        for i in range(7):
+            d = cur + timedelta(days=i)
+            if d in run_by_date:
+                info = run_by_date[d]
+                dist = info["dist"]
+                stem = info["stem"]
+                text = f"{dist:.1f}k"
+                if (analysis_dir / f"{stem}.md").exists():
+                    text = f"[{text}](analysis/{stem}.md)"
+                cells.append(f"**{text}**")
+            else:
+                cells.append("")
+        lines.append(f"| {week_label} | " + " | ".join(cells) + " |")
+        cur += timedelta(weeks=1)
+
+    return "\n".join(lines)
+
+
+def _trend_section(rows: list[dict]) -> str:
+    valid = []
+    for row in rows:
+        timer_s = row.get("timer_s")
+        dist_m = row.get("distance_m")
+        avg_hr, _ = _extract_avg_and_max_hr(str(row.get("table_avg_max_hr") or ""))
+        if not timer_s or not dist_m or not avg_hr:
+            continue
+        timer_s, dist_m = float(timer_s), float(dist_m)
+        if timer_s <= 0 or dist_m <= 0:
+            continue
+        valid.append({
+            "pace_sec": timer_s / (dist_m / 1000),
+            "dist_km": dist_m / 1000,
+            "avg_hr": avg_hr,
+            "efficiency": dist_m / (timer_s / 60 * avg_hr),
+        })
+
+    if len(valid) < 6:
+        return ""
+
+    n = min(8, len(valid) // 2)
+    early, recent = valid[:n], valid[-n:]
+
+    def avg(lst: list[dict], key: str) -> float:
+        return sum(x[key] for x in lst) / len(lst)
+
+    def pace_fmt(sec: float) -> str:
+        m, s = divmod(int(round(sec)), 60)
+        return f"{m}:{s:02d} /km"
+
+    def arrow(early_val: float, recent_val: float, higher_is_better: bool) -> str:
+        diff_pct = (recent_val - early_val) / early_val * 100
+        improved = diff_pct > 2 if higher_is_better else diff_pct < -2
+        worsened = diff_pct < -2 if higher_is_better else diff_pct > 2
+        return "↑" if improved else ("↓" if worsened else "→")
+
+    e_pace, r_pace = avg(early, "pace_sec"), avg(recent, "pace_sec")
+    e_dist, r_dist = avg(early, "dist_km"), avg(recent, "dist_km")
+    e_hr, r_hr = avg(early, "avg_hr"), avg(recent, "avg_hr")
+    e_eff, r_eff = avg(early, "efficiency"), avg(recent, "efficiency")
+
+    pace_diff = int(round(e_pace - r_pace))
+    pace_note = f"快了 {pace_diff}s" if pace_diff > 0 else (f"慢了 {-pace_diff}s" if pace_diff < 0 else "持平")
+    dist_diff = r_dist - e_dist
+    dist_note = f"{dist_diff:+.1f} km"
+    hr_note = f"{r_hr - e_hr:+.0f} bpm"
+    eff_diff_pct = (r_eff - e_eff) / e_eff * 100
+    eff_note = f"進步 {eff_diff_pct:.1f}%" if eff_diff_pct > 0 else f"退步 {-eff_diff_pct:.1f}%"
+
+    lines = [
+        "### 訓練趨勢",
+        "",
+        f"前 {n} 場 vs 近 {n} 場比較：",
+        "",
+        "| 指標 | 前期 | 近期 | 變化 |",
+        "| --- | :---: | :---: | :---: |",
+        f"| 平均配速 | {pace_fmt(e_pace)} | {pace_fmt(r_pace)} | {arrow(e_pace, r_pace, False)} {pace_note} |",
+        f"| 平均距離 | {e_dist:.1f} km | {r_dist:.1f} km | {arrow(e_dist, r_dist, True)} {dist_note} |",
+        f"| 平均心率 | {e_hr:.0f} bpm | {r_hr:.0f} bpm | {arrow(e_hr, r_hr, False)} {hr_note} |",
+        f"| 心率效率 | {e_eff:.2f} m/beat | {r_eff:.2f} m/beat | {arrow(e_eff, r_eff, True)} {eff_note} |",
+        "",
+        "_心率效率 = 每次心跳推進幾公尺，數值越高代表心肺效率越好。_",
+    ]
     return "\n".join(lines)
 
 
 def _table_cell(value: object) -> str:
     text = str(value).strip() if value is not None else ""
     return text or "—"
-
-
-def _history_table_section(rows: list[dict], analysis_dir: Path) -> str:
-    lines = [
-        "### 歷史詳細數據表",
-        "",
-        "| 日期 | 時長 | 距離 | 配速 | 心率（均／高） | 卡路里 |",
-        "| --- | --- | --- | --- | --- | --- |",
-    ]
-
-    for row in rows:
-        fit_name = str(row.get("fit_basename") or "")
-        stem = Path(fit_name).stem
-        date_cell = _table_cell(row.get("table_datetime_short"))
-        has_analysis = (analysis_dir / f"{stem}.md").exists() if stem else False
-        if has_analysis and date_cell != "—":
-            date_cell = f"[{date_cell}](analysis/{stem}.md)"
-
-        lines.append(
-            "| "
-            + " | ".join(
-                [
-                    date_cell,
-                    _table_cell(row.get("table_elapsed_hms")),
-                    _table_cell(row.get("table_distance_km")),
-                    _table_cell(row.get("table_pace")),
-                    _table_cell(row.get("table_avg_max_hr")),
-                    _table_cell(row.get("table_calories")),
-                ],
-            )
-            + " |",
-        )
-    return "\n".join(lines)
 
 
 def _short_date_label(date_text: str) -> str:
@@ -323,12 +384,9 @@ def _limits_section() -> str:
         [
             "### 資料限制與免責",
             "",
-            "- 歷史表為 FIT/TCX 解析後的 session 層級摘要，用於跨場次基本對照。",
             "- 目標脈絡來自 `training_profile.json`，跑後主觀感受僅在 `training_journal/*.json` 存在時納入。",
             "- 本內容非醫療建議與非診斷，身體若有異常不適請尋求合格專業協助。",
-            "- 單次活動的深度解讀與圖表請見各 `analysis/<stem>.md`。",
-            "",
-            "單次活動完整分析（表／圖／教練文字）見各 `analysis/<stem>.md`。",
+            "- 單次活動完整分析（表／圖／教練文字）見各 `analysis/<stem>.md`。",
         ],
     )
 
@@ -349,11 +407,12 @@ def render_ai_section(
     snapshot = snapshot if isinstance(snapshot, dict) else {}
     journal_count = int(summary.get("training_journal_entry_count") or 0)
 
+    trend = _trend_section(rows)
     parts = [
         _goal_section(profile),
         _weekly_section(snapshot),
-        _analysis_list_section(rows, analysis_dir),
-        _history_table_section(rows, analysis_dir),
+        *(([trend]) if trend else []),
+        _calendar_heatmap_section(rows, analysis_dir),
         _coach_notes_section(rows, journal_count, coach_notes_path),
         _source_section(rows, fit_path, fit_stem),
         _limits_section(),
