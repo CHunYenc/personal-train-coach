@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 AI_HEADING = "## AI 教練分析報告"
-COACH_HEADING = "### 看完歷史詳細數據後的教練小提醒："
+COACH_HEADING = "### 教練小提醒"
 
 
 def _read_json(path: Path) -> dict:
@@ -196,49 +196,6 @@ def _table_cell(value: object) -> str:
     return text or "—"
 
 
-def _history_table_section(rows: list[dict], analysis_dir: Path) -> str:
-    table_lines = [
-        "| 日期 | 時長 | 距離 | 配速 | 心率（均／高） | 卡路里 |",
-        "| --- | --- | --- | --- | --- | --- |",
-    ]
-
-    for row in rows:
-        fit_name = str(row.get("fit_basename") or "")
-        stem = Path(fit_name).stem
-        date_cell = _table_cell(row.get("table_datetime_short"))
-        has_analysis = (analysis_dir / f"{stem}.md").exists() if stem else False
-        if has_analysis and date_cell != "—":
-            date_cell = f"[{date_cell}](analysis/{stem}.md)"
-
-        table_lines.append(
-            "| "
-            + " | ".join(
-                [
-                    date_cell,
-                    _table_cell(row.get("table_elapsed_hms")),
-                    _table_cell(row.get("table_distance_km")),
-                    _table_cell(row.get("table_pace")),
-                    _table_cell(row.get("table_avg_max_hr")),
-                    _table_cell(row.get("table_calories")),
-                ],
-            )
-            + " |",
-        )
-
-    count = len(rows)
-    lines = [
-        "### 歷史詳細數據表",
-        "",
-        f"<details>",
-        f"<summary>展開所有 {count} 筆紀錄</summary>",
-        "",
-        *table_lines,
-        "",
-        "</details>",
-    ]
-    return "\n".join(lines)
-
-
 def _short_date_label(date_text: str) -> str:
     match = re.match(r"^\d{4}/(\d{2}/\d{2}\s\d{2}:\d{2})$", date_text)
     return match.group(1) if match else date_text
@@ -360,12 +317,9 @@ def _limits_section() -> str:
         [
             "### 資料限制與免責",
             "",
-            "- 歷史表為 FIT/TCX 解析後的 session 層級摘要，用於跨場次基本對照。",
             "- 目標脈絡來自 `training_profile.json`，跑後主觀感受僅在 `training_journal/*.json` 存在時納入。",
             "- 本內容非醫療建議與非診斷，身體若有異常不適請尋求合格專業協助。",
-            "- 單次活動的深度解讀與圖表請見各 `analysis/<stem>.md`。",
-            "",
-            "單次活動完整分析（表／圖／教練文字）見各 `analysis/<stem>.md`。",
+            "- 單次活動完整分析（表／圖／教練文字）見各 `analysis/<stem>.md`。",
         ],
     )
 
@@ -390,7 +344,6 @@ def render_ai_section(
         _goal_section(profile),
         _weekly_section(snapshot),
         _calendar_heatmap_section(rows, analysis_dir),
-        _history_table_section(rows, analysis_dir),
         _coach_notes_section(rows, journal_count, coach_notes_path),
         _source_section(rows, fit_path, fit_stem),
         _limits_section(),
