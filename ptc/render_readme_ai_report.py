@@ -191,6 +191,73 @@ def _calendar_heatmap_section(rows: list[dict], analysis_dir: Path) -> str:
     return "\n".join(lines)
 
 
+def _trend_section(rows: list[dict]) -> str:
+    valid = []
+    for row in rows:
+        timer_s = row.get("timer_s")
+        dist_m = row.get("distance_m")
+        avg_hr, _ = _extract_avg_and_max_hr(str(row.get("table_avg_max_hr") or ""))
+        if not timer_s or not dist_m or not avg_hr:
+            continue
+        timer_s, dist_m = float(timer_s), float(dist_m)
+        if timer_s <= 0 or dist_m <= 0:
+            continue
+        valid.append({
+            "pace_sec": timer_s / (dist_m / 1000),
+            "dist_km": dist_m / 1000,
+            "avg_hr": avg_hr,
+            "efficiency": dist_m / (timer_s / 60 * avg_hr),
+        })
+
+    if len(valid) < 6:
+        return ""
+
+    n = min(8, len(valid) // 2)
+    early, recent = valid[:n], valid[-n:]
+
+    def avg(lst: list[dict], key: str) -> float:
+        return sum(x[key] for x in lst) / len(lst)
+
+    def pace_fmt(sec: float) -> str:
+        m, s = divmod(int(round(sec)), 60)
+        return f"{m}:{s:02d} /km"
+
+    def arrow(early_val: float, recent_val: float, higher_is_better: bool) -> str:
+        diff_pct = (recent_val - early_val) / early_val * 100
+        improved = diff_pct > 2 if higher_is_better else diff_pct < -2
+        worsened = diff_pct < -2 if higher_is_better else diff_pct > 2
+        return "↑" if improved else ("↓" if worsened else "→")
+
+    e_pace, r_pace = avg(early, "pace_sec"), avg(recent, "pace_sec")
+    e_dist, r_dist = avg(early, "dist_km"), avg(recent, "dist_km")
+    e_hr, r_hr = avg(early, "avg_hr"), avg(recent, "avg_hr")
+    e_eff, r_eff = avg(early, "efficiency"), avg(recent, "efficiency")
+
+    pace_diff = int(round(e_pace - r_pace))
+    pace_note = f"快了 {pace_diff}s" if pace_diff > 0 else (f"慢了 {-pace_diff}s" if pace_diff < 0 else "持平")
+    dist_diff = r_dist - e_dist
+    dist_note = f"{dist_diff:+.1f} km"
+    hr_note = f"{r_hr - e_hr:+.0f} bpm"
+    eff_diff_pct = (r_eff - e_eff) / e_eff * 100
+    eff_note = f"進步 {eff_diff_pct:.1f}%" if eff_diff_pct > 0 else f"退步 {-eff_diff_pct:.1f}%"
+
+    lines = [
+        "### 訓練趨勢",
+        "",
+        f"前 {n} 場 vs 近 {n} 場比較：",
+        "",
+        "| 指標 | 前期 | 近期 | 變化 |",
+        "| --- | :---: | :---: | :---: |",
+        f"| 平均配速 | {pace_fmt(e_pace)} | {pace_fmt(r_pace)} | {arrow(e_pace, r_pace, False)} {pace_note} |",
+        f"| 平均距離 | {e_dist:.1f} km | {r_dist:.1f} km | {arrow(e_dist, r_dist, True)} {dist_note} |",
+        f"| 平均心率 | {e_hr:.0f} bpm | {r_hr:.0f} bpm | {arrow(e_hr, r_hr, False)} {hr_note} |",
+        f"| 心率效率 | {e_eff:.2f} m/beat | {r_eff:.2f} m/beat | {arrow(e_eff, r_eff, True)} {eff_note} |",
+        "",
+        "_心率效率 = 每次心跳推進幾公尺，數值越高代表心肺效率越好。_",
+    ]
+    return "\n".join(lines)
+
+
 def _table_cell(value: object) -> str:
     text = str(value).strip() if value is not None else ""
     return text or "—"
@@ -340,9 +407,11 @@ def render_ai_section(
     snapshot = snapshot if isinstance(snapshot, dict) else {}
     journal_count = int(summary.get("training_journal_entry_count") or 0)
 
+    trend = _trend_section(rows)
     parts = [
         _goal_section(profile),
         _weekly_section(snapshot),
+        *(([trend]) if trend else []),
         _calendar_heatmap_section(rows, analysis_dir),
         _coach_notes_section(rows, journal_count, coach_notes_path),
         _source_section(rows, fit_path, fit_stem),
