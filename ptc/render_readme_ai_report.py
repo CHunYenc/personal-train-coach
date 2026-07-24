@@ -137,6 +137,22 @@ def _weekly_section(snapshot: dict) -> str:
     return "\n".join(lines)
 
 
+_ACTIVITY_DATE_RE = re.compile(r"(20\d{2})(0[1-9]|1[0-2])[0-3]\d")
+
+
+def _month_key(stem: str) -> str:
+    match = _ACTIVITY_DATE_RE.search(stem)
+    return f"{match.group(1)}{match.group(2)}" if match else "其他"
+
+
+def _activity_sort_key(stem: str) -> tuple[int, str, str]:
+    match = _ACTIVITY_DATE_RE.search(stem)
+    if not match:
+        return (1, "", stem)
+    trailing_digits = re.match(r"\d+", stem[match.start():])
+    return (0, trailing_digits.group(0) if trailing_digits else match.group(0), stem)
+
+
 def _analysis_list_section(rows: list[dict], analysis_dir: Path) -> str:
     label_by_stem: dict[str, str] = {}
     for row in rows:
@@ -146,10 +162,9 @@ def _analysis_list_section(rows: list[dict], analysis_dir: Path) -> str:
             label_by_stem[stem] = str(row.get("table_datetime_short") or "")
 
     groups: dict[str, list[str]] = {}
-    for path in sorted(analysis_dir.glob("*.md"), key=lambda p: p.stem):
+    for path in analysis_dir.glob("*.md"):
         stem = path.stem
-        key = stem[:6] if len(stem) >= 6 else stem
-        groups.setdefault(key, []).append(stem)
+        groups.setdefault(_month_key(stem), []).append(stem)
 
     lines = ["### 歷史分析報告列表", ""]
     if not groups:
@@ -158,7 +173,7 @@ def _analysis_list_section(rows: list[dict], analysis_dir: Path) -> str:
 
     for month in sorted(groups):
         lines.append(f"- {month}")
-        for stem in groups[month]:
+        for stem in sorted(groups[month], key=_activity_sort_key):
             label = label_by_stem.get(stem) or stem
             lines.append(f"  - [{label}](analysis/{stem}.md)")
     return "\n".join(lines)
