@@ -238,11 +238,10 @@ def _extract_avg_and_max_hr(text: str) -> tuple[int | None, int | None]:
     return None, None
 
 
-def _fallback_notes(rows: list[dict], journal_count: int) -> list[str]:
+def _fallback_notes(rows: list[dict]) -> list[str]:
     if not rows:
         return [
             "- 場次範圍（0 筆）：目前尚無可分析歷史資料",
-            f"- 資料範圍限制：主觀感受僅在 training_journal 有紀錄時納入（目前 {journal_count} 筆）",
             "- 非醫療聲明：本內容為訓練紀錄整理用途",
         ]
 
@@ -292,14 +291,12 @@ def _fallback_notes(rows: list[dict], journal_count: int) -> list[str]:
         max_hr_text = f"，峰值最高 {max(max_hrs)} bpm" if max_hrs else ""
         lines.append(f"- 心率（均心率 {min(avg_hrs)}–{max(avg_hrs)} bpm{max_hr_text}）")
 
-    lines.append(
-        f"- 資料範圍限制：歷史表為 session 摘要，主觀感受僅在 training_journal 有紀錄時納入（目前 {journal_count} 筆）",
-    )
+    lines.append("- 資料範圍限制：歷史表為 session 摘要")
     lines.append("- 非醫療聲明：訓練紀錄整理用途，異常不適請諮詢合格專業")
     return lines[:6]
 
 
-def _coach_notes_section(rows: list[dict], journal_count: int, coach_notes_path: Path) -> str:
+def _coach_notes_section(rows: list[dict], coach_notes_path: Path) -> str:
     notes: list[str] = []
     if coach_notes_path.exists():
         text = coach_notes_path.read_text(encoding="utf-8")
@@ -309,7 +306,7 @@ def _coach_notes_section(rows: list[dict], journal_count: int, coach_notes_path:
                 notes.append(m.group(1))
 
     if len(notes) < 4:
-        notes = [line[2:] for line in _fallback_notes(rows, journal_count)]
+        notes = [line[2:] for line in _fallback_notes(rows)]
 
     lines = [COACH_HEADING, ""]
     for note in notes[:6]:
@@ -339,7 +336,7 @@ def _limits_section() -> str:
             "### 資料限制與免責",
             "",
             "- 歷史表為 FIT/TCX 解析後的 session 層級摘要，用於跨場次基本對照。",
-            "- 目標脈絡來自 `training_profile.json`，跑後主觀感受僅在 `training_journal/*.json` 存在時納入。",
+            "- 目標脈絡來自 `training_profile.json`。",
             "- 本內容非醫療建議與非診斷，身體若有異常不適請尋求合格專業協助。",
             "- 單次活動的深度解讀與圖表請見各 `analysis/<stem>.md`。",
             "",
@@ -362,14 +359,13 @@ def render_ai_section(
     profile = profile if isinstance(profile, dict) else {}
     snapshot = summary.get("training_snapshot")
     snapshot = snapshot if isinstance(snapshot, dict) else {}
-    journal_count = int(summary.get("training_journal_entry_count") or 0)
 
     parts = [
         _goal_section(profile),
         _weekly_section(snapshot),
         _analysis_list_section(rows, analysis_dir),
         _history_table_section(rows, analysis_dir),
-        _coach_notes_section(rows, journal_count, coach_notes_path),
+        _coach_notes_section(rows, coach_notes_path),
         _source_section(rows, fit_path, fit_stem),
         _limits_section(),
     ]
