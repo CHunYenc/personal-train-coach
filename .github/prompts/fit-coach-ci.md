@@ -35,7 +35,7 @@ Rules:
 - in `## 現況摘要`, include a primary table with: 活動時間, 時長, 距離, 配速, 心率（低／均／高）, 卡路里, 裝置
 - secondary table optional when fields exist
 - mention non-medical / non-diagnostic boundary once in `## 補充觀點`
-- if subjective data is absent in `__LLM_INPUT_PATH__`, clearly ask for RPE / enjoyment instead of guessing
+- if subjective data is absent in `__LLM_INPUT_PATH__`, silently omit any reference to RPE or subjective feedback; do not ask the runner to fill anything in
 
 ## Output 2: `coach_notes.md` (now from llm_input only)
 
