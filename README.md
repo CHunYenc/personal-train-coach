@@ -19,6 +19,7 @@ uv run coach-parse data/你的檔.fit --json
 personal-train-coach/
 ├── data/        # COROS/Garmin .fit 活動檔（唯一真相來源）
 ├── analysis/    # AI 教練逐場分析報告（每筆活動一份 .md）
+├── training_plan/  # 階段性訓練課表（依季節與目標調整）
 ├── training_profile.json   # 目標、賽事與長期動機設定
 ├── training_journal/       # 跑後 RPE、心情、開心程度等主觀紀錄
 ├── ptc/         # Python 套件：FIT 解析（cli.py）、跨場次摘要（build_sessions_summary.py）
@@ -26,6 +27,10 @@ personal-train-coach/
 ```
 
 `data/` 放裝置匯出的 `.fit`；`training_profile.json` 記錄目標與動機；`training_journal/` 可補跑後主觀感受；`analysis/` 是每次 CI 跑完後自動生成的教練報告，可直接點下方連結閱讀。
+
+## 訓練課表
+
+- [2026 夏季訓練課表（6/09 → 7月底）](training_plan/2026-summer.md) — 因應台灣盛夏高溫，以心率為煞車、長跑移至週末早晨的打底課表。
 
 ---
 
